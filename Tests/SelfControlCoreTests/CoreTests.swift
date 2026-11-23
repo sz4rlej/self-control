@@ -78,7 +78,7 @@ final class CoreTests: XCTestCase {
     func testStats() {
         var st = Stats()
         XCTAssertTrue(st.record(domain: "x.com", at: date(23, 10)))
-        XCTAssertFalse(st.record(domain: "x.com", at: date(23, 10, 0).addingTimeInterval(30)))
+        XCTAssertFalse(st.record(domain: "x.com", at: date(23, 10, 0).addingTimeInterval(3)))
         st.record(domain: "x.com", at: date(23, 11))
         st.record(domain: "y.com", at: date(23, 11))
         st.record(domain: "x.com", at: date(22, 11)) // niedziela — poprzedni tydzień

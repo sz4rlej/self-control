@@ -10,8 +10,8 @@ public struct Stats: Codable, Equatable {
 
     /// Ile minut skupienia kosztuje jedno rozproszenie.
     public static let focusMinutesPerAttempt = 3
-    /// Ponowne wejście na tę samą domenę w tym czasie liczy się jako ta sama próba (odświeżenia, przekierowania).
-    public static let dedupeWindow: TimeInterval = 60
+    /// Żądania tej samej domeny w tym czasie to jedna próba (przekierowania, podwójne żądania przeglądarki).
+    public static let dedupeWindow: TimeInterval = 5
     static let keepDays = 60
 
     public var attempts: [Attempt]
