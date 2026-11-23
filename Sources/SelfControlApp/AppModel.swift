@@ -84,6 +84,10 @@ final class AppModel: ObservableObject {
         return eff.isActive(at: now)
     }
 
+    func enforcedSchedule(_ id: UUID) -> Schedule? {
+        state?.effective.schedules.first { $0.id == id }
+    }
+
     var pendingChanges: Bool {
         guard let eff = state?.effective else { return false }
         return Set(config.normalizedDomains) != Set(eff.normalizedDomains) || config.schedules != eff.schedules

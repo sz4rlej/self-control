@@ -68,11 +68,14 @@ struct RootView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            switch tab {
-            case .status: StatusView()
-            case .domains: DomainsView()
-            case .schedule: ScheduleListView()
+            Group {
+                switch tab {
+                case .status: StatusView()
+                case .domains: DomainsView()
+                case .schedule: ScheduleListView()
+                }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
 
             if !model.daemonAlive {
                 Label("Demon nie działa — uruchom scripts/install.sh", systemImage: "exclamationmark.triangle.fill")
@@ -83,7 +86,7 @@ struct RootView: View {
             }
         }
         .padding(14)
-        .frame(width: 320)
+        .frame(width: 320, height: 470)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -283,8 +286,7 @@ struct DomainsView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 280)
-                .fixedSize(horizontal: false, vertical: true)
+
             }
 
             Text(verbatim: model.blocking && model.pendingChanges
@@ -320,14 +322,13 @@ struct ScheduleListView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         ForEach($draft) { $s in
-                            ScheduleCard(schedule: $s, locked: model.isScheduleLocked(s)) {
+                            ScheduleCard(schedule: $s, locked: model.isScheduleLocked(s), enforced: model.enforcedSchedule(s.id)) {
                                 draft.removeAll { $0.id == s.id }
                             }
                         }
                     }
                 }
-                .frame(maxHeight: 360)
-                .fixedSize(horizontal: false, vertical: true)
+
             }
 
             if dirty, let until = model.extendsBlock(with: draft) {
@@ -359,6 +360,8 @@ struct ScheduleListView: View {
 struct ScheduleCard: View {
     @Binding var schedule: Schedule
     let locked: Bool
+    /// Wersja, którą demon wymusza do końca trwającego okna.
+    var enforced: Schedule? = nil
     let onDelete: () -> Void
 
     var body: some View {
@@ -401,6 +404,15 @@ struct ScheduleCard: View {
                     .help("Usuń harmonogram")
             }
             .padding(.vertical, 2)
+            if locked, let e = enforced, e != schedule {
+                Divider().padding(.leading, 10)
+                GroupRow {
+                    Label("Teraz obowiązuje \(hm(e.startMinute))–\(hm(e.endMinute)); zmiany po końcu tego okna.",
+                          systemImage: "lock.fill")
+                        .font(.caption).foregroundStyle(.red)
+                }
+                .padding(.vertical, 4)
+            }
         }
         .opacity(schedule.enabled ? 1 : 0.6)
     }
@@ -422,3 +434,5 @@ struct TimeField: View {
         .fixedSize()
     }
 }
+
+func hm(_ m: Int) -> String { String(format: "%02d:%02d", m / 60, m % 60) }
