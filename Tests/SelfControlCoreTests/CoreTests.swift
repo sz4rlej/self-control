@@ -87,6 +87,10 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(s.domainWeek, 2)
         XCTAssertEqual(s.allToday, 3)
         XCTAssertEqual(s.savedTodayMinutes, 9)
+        XCTAssertEqual(s.topToday, [.init(domain: "x.com", count: 2), .init(domain: "y.com", count: 1)])
+        XCTAssertEqual(s.hourlyToday[10], 1)
+        XCTAssertEqual(s.hourlyToday[11], 2)
+        XCTAssertEqual(s.recentToday.first?.at, date(23, 11))
         XCTAssertEqual(Stats.matchDomain(host: "old.reddit.com:443", in: ["reddit.com", "x.com"]), "reddit.com")
         XCTAssertNil(Stats.matchDomain(host: "notreddit.com", in: ["reddit.com"]))
     }

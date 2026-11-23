@@ -30,8 +30,19 @@ public struct Stats: Codable, Equatable {
         return true
     }
 
+    public struct DomainCount: Equatable {
+        public var domain: String
+        public var count: Int
+    }
+
     public struct Summary: Equatable {
         public var domainToday = 0, domainWeek = 0, allToday = 0, allWeek = 0
+        /// Domeny wg liczby prób dziś (malejąco).
+        public var topToday: [DomainCount] = []
+        /// Liczba prób dziś w każdej godzinie (0…23).
+        public var hourlyToday = Array(repeating: 0, count: 24)
+        /// Dzisiejsze próby, najnowsze pierwsze.
+        public var recentToday: [Attempt] = []
         public var savedTodayMinutes: Int { allToday * Stats.focusMinutesPerAttempt }
         public var savedWeekMinutes: Int { allWeek * Stats.focusMinutesPerAttempt }
     }
@@ -42,15 +53,24 @@ public struct Stats: Codable, Equatable {
         let dayStart = iso.startOfDay(for: now)
         let weekStart = iso.dateInterval(of: .weekOfYear, for: now)?.start ?? dayStart
         var s = Summary()
+        var perDomain: [String: Int] = [:]
         for a in attempts where a.at >= weekStart && a.at <= now {
             let today = a.at >= dayStart
             s.allWeek += 1
-            if today { s.allToday += 1 }
+            if today {
+                s.allToday += 1
+                perDomain[a.domain, default: 0] += 1
+                s.hourlyToday[iso.component(.hour, from: a.at)] += 1
+                s.recentToday.append(a)
+            }
             if a.domain == domain {
                 s.domainWeek += 1
                 if today { s.domainToday += 1 }
             }
         }
+        s.topToday = perDomain.map { DomainCount(domain: $0.key, count: $0.value) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.domain < $1.domain }
+        s.recentToday.reverse()
         return s
     }
 
@@ -93,12 +113,26 @@ public enum BlockPage {
         .sub { color:var(--muted); margin:0 0 28px; }
         .big { font-size:64px; font-weight:200; line-height:1; letter-spacing:-1px; }
         .big small { display:block; font-size:14px; font-weight:400; color:var(--muted); letter-spacing:0; margin-top:8px; }
-        .card { background:var(--card); border:0.5px solid var(--line); border-radius:12px; margin-top:28px; text-align:left; }
+        .card { background:var(--card); border:0.5px solid var(--line); border-radius:12px; margin-top:28px; text-align:left; overflow:hidden; }
         .row { display:flex; justify-content:space-between; padding:11px 14px; }
         .row + .row { border-top:0.5px solid var(--line); }
         .row span:last-child { font-variant-numeric:tabular-nums; color:var(--muted); }
         .saved span:last-child { color:var(--good); font-weight:600; }
         .note { color:var(--muted); font-size:12px; margin-top:14px; }
+        h2 { font-size:13px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; text-align:left; margin:28px 4px 8px; }
+        h2 + .card { margin-top:0; }
+        .bar { position:relative; }
+        .bar::before { content:""; position:absolute; left:0; top:0; bottom:0; width:var(--w); background:var(--accent); opacity:.1; }
+        .bar.me::before { opacity:.2; }
+        .bar span { position:relative; }
+        .hours { display:flex; align-items:flex-end; gap:3px; height:96px; padding:14px 14px 0; }
+        .hours div { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; }
+        .hours i { display:block; width:100%; background:var(--accent); border-radius:3px 3px 0 0; min-height:0; }
+        .hours i.zero { background:var(--line); height:2px !important; }
+        .hours b { font-size:10px; font-weight:500; color:var(--muted); margin-bottom:2px; font-variant-numeric:tabular-nums; }
+        .labels { display:flex; gap:3px; padding:4px 14px 10px; }
+        .labels span { flex:1; text-align:center; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
+        .time { color:var(--muted); font-variant-numeric:tabular-nums; margin-right:10px; }
         </style></head>
         <body><main>
         <div class="lock"><svg width="24" height="28" viewBox="0 0 24 28" fill="none"><rect x="2" y="12" width="20" height="15" rx="3" fill="#fff"/><path d="M6.5 12V8a5.5 5.5 0 0 1 11 0v4" stroke="#fff" stroke-width="3"/></svg></div>
@@ -111,9 +145,51 @@ public enum BlockPage {
           <div class="row saved"><span>Odzyskany czas dziś</span><span>\(formatMinutes(s.savedTodayMinutes))</span></div>
           <div class="row saved"><span>Odzyskany czas w tym tygodniu</span><span>\(formatMinutes(s.savedWeekMinutes))</span></div>
         </div>
+        \(details(domain: domain, summary: s, calendar: calendar))
         <p class="note">Liczymy ok. \(Stats.focusMinutesPerAttempt) min utraconego skupienia na każde rozproszenie.</p>
         </main></body></html>
         """
+    }
+
+    /// Ranking domen, rozkład godzinowy i lista dzisiejszych prób.
+    static func details(domain: String, summary s: Stats.Summary, calendar: Calendar) -> String {
+        guard !s.topToday.isEmpty else { return "" }
+        var html = ""
+
+        let maxCount = s.topToday.first?.count ?? 1
+        let rows = s.topToday.prefix(8).map { item -> String in
+            let w = Int((Double(item.count) / Double(maxCount) * 100).rounded())
+            let me = item.domain == domain ? " me" : ""
+            return "<div class=\"row bar\(me)\" style=\"--w:\(w)%\"><span>\(escape(item.domain))</span><span>\(item.count)</span></div>"
+        }
+        html += "<h2>Najczęściej dziś</h2><div class=\"card\">\(rows.joined())</div>"
+
+        // Godziny od pierwszej próby (najpóźniej od 8) do bieżącej / ostatniej.
+        let active = s.hourlyToday.indices.filter { s.hourlyToday[$0] > 0 }
+        let nowHour = calendar.component(.hour, from: Date())
+        let from = min(active.first ?? 8, 8)
+        let to = max(active.last ?? nowHour, min(nowHour, 23), from + 7)
+        let range = from...min(to, 23)
+        let peak = max(range.map { s.hourlyToday[$0] }.max() ?? 1, 1)
+        let bars = range.map { h -> String in
+            let n = s.hourlyToday[h]
+            let pct = Int(Double(n) / Double(peak) * 100)
+            return n == 0 ? "<div><i class=\"zero\"></i></div>"
+                : "<div><b>\(n)</b><i style=\"height:\(max(pct, 4))%\"></i></div>"
+        }
+        let labels = range.map { "<span>\($0)</span>" }
+        html += "<h2>O której godzinie</h2><div class=\"card\"><div class=\"hours\">\(bars.joined())</div><div class=\"labels\">\(labels.joined())</div></div>"
+
+        let f = DateFormatter()
+        f.calendar = calendar
+        f.timeZone = calendar.timeZone
+        f.dateFormat = "HH:mm"
+        let recent = s.recentToday.prefix(10).map {
+            "<div class=\"row\"><span><span class=\"time\">\(f.string(from: $0.at))</span>\(escape($0.domain))</span><span></span></div>"
+        }
+        let more = s.recentToday.count > 10 ? "<div class=\"row\"><span class=\"time\">…i \(s.recentToday.count - 10) wcześniej</span><span></span></div>" : ""
+        html += "<h2>Ostatnie próby</h2><div class=\"card\">\(recent.joined())\(more)</div>"
+        return html
     }
 
     private static func escape(_ s: String) -> String {
