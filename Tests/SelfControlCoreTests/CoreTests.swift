@@ -70,8 +70,24 @@ final class CoreTests: XCTestCase {
     func testHostsRenderIsIdempotent() {
         let base = "127.0.0.1\tlocalhost\n"
         let blocked = Hosts.render(original: base, domains: ["x.com"])
-        XCTAssertTrue(blocked.contains("0.0.0.0\twww.x.com"))
+        XCTAssertTrue(blocked.contains("127.94.0.1\twww.x.com"))
         XCTAssertEqual(Hosts.render(original: blocked, domains: ["x.com"]), blocked)
         XCTAssertEqual(Hosts.render(original: blocked, domains: []), base)
+    }
+
+    func testStats() {
+        var st = Stats()
+        XCTAssertTrue(st.record(domain: "x.com", at: date(23, 10)))
+        XCTAssertFalse(st.record(domain: "x.com", at: date(23, 10, 0).addingTimeInterval(30)))
+        st.record(domain: "x.com", at: date(23, 11))
+        st.record(domain: "y.com", at: date(23, 11))
+        st.record(domain: "x.com", at: date(22, 11)) // niedziela — poprzedni tydzień
+        let s = st.summary(domain: "x.com", now: date(23, 12), calendar: cal)
+        XCTAssertEqual(s.domainToday, 2)
+        XCTAssertEqual(s.domainWeek, 2)
+        XCTAssertEqual(s.allToday, 3)
+        XCTAssertEqual(s.savedTodayMinutes, 9)
+        XCTAssertEqual(Stats.matchDomain(host: "old.reddit.com:443", in: ["reddit.com", "x.com"]), "reddit.com")
+        XCTAssertNil(Stats.matchDomain(host: "notreddit.com", in: ["reddit.com"]))
     }
 }

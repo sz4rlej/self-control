@@ -5,6 +5,7 @@ import SelfControlCore
 // 1. czyta żądaną konfigurację od aplikacji,
 // 2. łączy ją z obowiązującą (podczas blokady wolno tylko zaostrzać),
 // 3. ustawia /etc/hosts i zapisuje stan dla aplikacji.
+// Dodatkowo serwuje stronę blokady z licznikiem prób (BlockServer).
 
 func log(_ msg: String) {
     FileHandle.standardError.write("[\(ISO8601DateFormatter().string(from: Date()))] \(msg)\n".data(using: .utf8)!)
@@ -14,6 +15,8 @@ func run(_ path: String, _ args: [String]) {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: path)
     p.arguments = args
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
     try? p.run()
     p.waitUntilExit()
 }
@@ -23,7 +26,13 @@ func flushDNS() {
     run("/usr/bin/killall", ["-HUP", "mDNSResponder"])
 }
 
-func tick(now: Date = Date()) {
+/// Aliasy na lo0, na których słucha strona blokady.
+func addLoopbackAliases() {
+    run("/sbin/ifconfig", ["lo0", "alias", Hosts.blockIPv4, "up"])
+    run("/sbin/ifconfig", ["lo0", "inet6", Hosts.blockIPv6, "prefixlen", "128", "alias"])
+}
+
+func tick(now: Date = Date(), certs: Certs?, server: BlockServer?) {
     let previous = JSON.load(DaemonState.self, from: Paths.state)
     let effective = previous?.effective ?? Config()
     let requested = JSON.load(Config.self, from: Paths.request) ?? effective
@@ -31,7 +40,12 @@ func tick(now: Date = Date()) {
     let merged = Policy.merge(effective: effective, requested: requested, now: now)
     let until = merged.blockingUntil(at: now)
     let blocking = until != nil
-    let domains = blocking ? merged.normalizedDomains : []
+    let allDomains = merged.normalizedDomains
+    let domains = blocking ? allDomains : []
+
+    // Certyfikat przed hosts, żeby strona blokady działała od pierwszej sekundy.
+    certs?.update(domains: allDomains)
+    server?.update(domains: allDomains, until: until)
 
     // /etc/hosts — przepisujemy przy każdej różnicy, więc ręczna edycja nic nie da.
     let hostsURL = Paths.hosts
@@ -61,9 +75,21 @@ func tick(now: Date = Date()) {
     }
 }
 
-let once = CommandLine.arguments.contains("--once")
-if !once { log("selfcontrold start") }
-repeat {
-    autoreleasepool { tick() }
-    if !once { Thread.sleep(forTimeInterval: 5) }
-} while !once
+let args = CommandLine.arguments
+if args.contains("--once") {
+    tick(certs: nil, server: nil)
+    exit(0)
+}
+
+log("selfcontrold start")
+try? FileManager.default.createDirectory(at: Paths.supportDir, withIntermediateDirectories: true)
+let certs = Certs(dir: Paths.supportDir)
+certs.ensureCA()
+if args.contains("--ca-only") { exit(0) }
+if getuid() == 0 { addLoopbackAliases() }
+let server = BlockServer(certs: certs)
+server.start()
+while true {
+    autoreleasepool { tick(certs: certs, server: server) }
+    Thread.sleep(forTimeInterval: 5)
+}

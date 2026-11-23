@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     }
     @Published private(set) var state: DaemonState?
     @Published private(set) var now = Date()
+    @Published private(set) var stats = Stats()
     @Published var error: String?
 
     private var timer: Timer?
@@ -27,6 +28,7 @@ final class AppModel: ObservableObject {
     func refresh() {
         now = Date()
         state = JSON.load(DaemonState.self, from: Paths.state)
+        stats = JSON.load(Stats.self, from: Paths.stats) ?? Stats()
         trackBlockStart()
     }
 

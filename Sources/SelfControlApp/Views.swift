@@ -155,6 +155,24 @@ struct StatusView: View {
             .tint(model.blocking ? .red : .accentColor)
             .keyboardShortcut(.defaultAction)
 
+            let s = model.stats.summary(now: model.now)
+            if s.allWeek > 0 {
+                SettingsGroup {
+                    GroupRow {
+                        Text("Próby wejścia")
+                        Spacer()
+                        Text("dziś \(s.allToday) · tydzień \(s.allWeek)").monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Divider().padding(.leading, 10)
+                    GroupRow {
+                        Text("Odzyskany czas")
+                        Spacer()
+                        Text("\(formatMinutes(s.savedTodayMinutes)) · \(formatMinutes(s.savedWeekMinutes))")
+                            .monospacedDigit().foregroundStyle(.green)
+                    }
+                }
+            }
+
             Text("Raz włączonej blokady nie da się przerwać.")
                 .font(.caption).foregroundStyle(.secondary)
         }

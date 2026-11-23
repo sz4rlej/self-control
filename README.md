@@ -3,6 +3,7 @@
 Blokada rozpraszających stron na macOS — ręcznie na czas albo wg harmonogramu (dni + godziny, także przez północ).
 
 - `selfcontrold` — demon root (launchd), co 5 s ustawia `/etc/hosts`. Podczas blokady zmiany mogą ją tylko zaostrzyć; usunięcie domeny, skrócenie czasu czy wyłączenie aktywnego harmonogramu wchodzi w życie po jej końcu.
+- Strona blokady: domeny wskazują na alias 127.94.0.1, demon serwuje tam HTTP/HTTPS (lokalny CA dodawany do zaufanych przy instalacji) i liczy próby wejścia (~3 min skupienia na próbę).
 - `SelfControlApp` — kłódka w pasku menu: start blokady, lista domen, harmonogramy.
 
 ```sh

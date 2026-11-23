@@ -17,6 +17,15 @@ mkdir -p /Users/Shared/SelfControl
 sudo launchctl bootout system/$LABEL 2>/dev/null || true
 sudo launchctl bootstrap system $PLIST
 
+echo "→ certyfikat strony blokady"
+CA="/Library/Application Support/SelfControl/tls/ca.crt"
+for i in {1..20}; do sudo test -f "$CA" && break; sleep 0.5; done
+if ! security find-certificate -c "Self-Control Local CA" /Library/Keychains/System.keychain >/dev/null 2>&1; then
+  sudo cat "$CA" > /tmp/selfcontrol-ca.crt
+  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/selfcontrol-ca.crt
+  rm -f /tmp/selfcontrol-ca.crt
+fi
+
 echo "→ aplikacja"
 pkill -x SelfControlApp 2>/dev/null || true
 rm -rf "$APP"

@@ -3,6 +3,10 @@ import Foundation
 public enum Hosts {
     public static let beginMarker = "# >>> self-control (nie edytuj) >>>"
     public static let endMarker = "# <<< self-control <<<"
+    /// Adresy pętli zwrotnej, na których demon pokazuje stronę blokady
+    /// (osobne aliasy, żeby nie gryźć się z lokalnymi serwerami na 127.0.0.1).
+    public static let blockIPv4 = "127.94.0.1"
+    public static let blockIPv6 = "fd5c:5c5c::1"
 
     /// Zwraca treść pliku hosts bez sekcji self-control, z nową sekcją dla `domains` (pusta = brak sekcji).
     public static func render(original: String, domains: [String]) -> String {
@@ -20,8 +24,8 @@ public enum Hosts {
             lines.append(beginMarker)
             for d in domains {
                 for h in Domain.hostVariants(d) {
-                    lines.append("0.0.0.0\t\(h)")
-                    lines.append("::\t\(h)")
+                    lines.append("\(blockIPv4)\t\(h)")
+                    lines.append("\(blockIPv6)\t\(h)")
                 }
             }
             lines.append(endMarker)

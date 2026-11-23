@@ -186,6 +186,10 @@ public enum Paths {
     public static var state: URL {
         URL(fileURLWithPath: env["SELFCONTROL_STATE"] ?? "/Library/Application Support/SelfControl/state.json")
     }
+    public static var supportDir: URL { state.deletingLastPathComponent() }
+    public static var stats: URL {
+        URL(fileURLWithPath: env["SELFCONTROL_STATS"] ?? supportDir.appendingPathComponent("stats.json").path)
+    }
     public static var hosts: URL {
         URL(fileURLWithPath: env["SELFCONTROL_HOSTS"] ?? "/etc/hosts")
     }
