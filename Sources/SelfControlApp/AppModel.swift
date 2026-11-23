@@ -107,6 +107,10 @@ final class AppModel: ObservableObject {
         return true
     }
 
+    func addDomains(_ list: [String]) {
+        for d in list { _ = addDomain(d) }
+    }
+
     func removeDomain(_ d: String) {
         config.domains.removeAll { Domain.normalize($0) == d }
     }

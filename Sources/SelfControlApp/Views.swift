@@ -258,6 +258,16 @@ struct DomainsView: View {
                     .onSubmit(add)
                     .onChange(of: input) { invalid = false }
                 Button("Dodaj", action: add).disabled(input.isEmpty)
+                Menu {
+                    ForEach(Preset.all) { p in
+                        Button("\(p.name) (\(p.domains.count))") { model.addDomains(p.domains) }
+                    }
+                } label: {
+                    Image(systemName: "list.bullet")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Gotowe listy")
             }
             if invalid { Text("Niepoprawna domena").font(.caption).foregroundStyle(.red) }
 
