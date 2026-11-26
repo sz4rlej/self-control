@@ -15,6 +15,7 @@ sudo install -m 755 -o root -g wheel "$BIN/selfcontrold" /usr/local/libexec/self
 sudo install -m 644 -o root -g wheel launchd/$LABEL.plist $PLIST
 mkdir -p /Users/Shared/SelfControl
 sudo launchctl bootout system/$LABEL 2>/dev/null || true
+for i in {1..20}; do sudo launchctl print system/$LABEL >/dev/null 2>&1 || break; sleep 0.5; done
 sudo launchctl bootstrap system $PLIST
 
 echo "→ certyfikat strony blokady"

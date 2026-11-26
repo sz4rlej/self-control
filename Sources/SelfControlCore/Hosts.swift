@@ -7,6 +7,9 @@ public enum Hosts {
     /// (osobne aliasy, żeby nie gryźć się z lokalnymi serwerami na 127.0.0.1).
     public static let blockIPv4 = "127.94.0.1"
     public static let blockIPv6 = "fd5c:5c5c::1"
+    /// iCloud Private Relay omija /etc/hosts (Safari pyta o DNS przez przekaźnik).
+    /// Pusta odpowiedź dla tych nazw wyłącza Private Relay na czas blokady.
+    public static let privateRelayHosts = ["mask.icloud.com", "mask-h2.icloud.com", "mask-canary.icloud.com"]
 
     /// Zwraca treść pliku hosts bez sekcji self-control, z nową sekcją dla `domains` (pusta = brak sekcji).
     public static func render(original: String, domains: [String]) -> String {
@@ -27,6 +30,10 @@ public enum Hosts {
                     lines.append("\(blockIPv4)\t\(h)")
                     lines.append("\(blockIPv6)\t\(h)")
                 }
+            }
+            for h in privateRelayHosts {
+                lines.append("0.0.0.0\t\(h)")
+                lines.append("::\t\(h)")
             }
             lines.append(endMarker)
         }

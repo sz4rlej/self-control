@@ -71,6 +71,7 @@ final class CoreTests: XCTestCase {
         let base = "127.0.0.1\tlocalhost\n"
         let blocked = Hosts.render(original: base, domains: ["x.com"])
         XCTAssertTrue(blocked.contains("127.94.0.1\twww.x.com"))
+        XCTAssertTrue(blocked.contains("0.0.0.0\tmask.icloud.com"))
         XCTAssertEqual(Hosts.render(original: blocked, domains: ["x.com"]), blocked)
         XCTAssertEqual(Hosts.render(original: blocked, domains: []), base)
     }
