@@ -1,5 +1,7 @@
 # Self-Control
 
+<p align="center"><img src="docs/screenshot.png" width="320" alt="Self-Control w pasku menu"></p>
+
 Blokada rozpraszających stron na macOS. Działa ręcznie (na określony czas), według harmonogramu (dni + godziny, także przez północ) albo w trybie pomodoro.
 
 Raz włączonej blokady nie da się obejść z poziomu aplikacji: można ją tylko zaostrzyć (dodać domeny, przedłużyć). Usunięcie domeny, skrócenie czasu czy wyłączenie aktywnego harmonogramu wchodzi w życie dopiero po końcu blokady.
