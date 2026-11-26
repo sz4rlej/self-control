@@ -14,7 +14,7 @@ struct SelfControlApp: App {
         MenuBarExtra {
             RootView().environmentObject(model)
         } label: {
-            Image(systemName: model.blocking ? "lock.fill" : "lock.open")
+            Image(nsImage: menuBarIcon(model.blocking))
         }
         .menuBarExtraStyle(.window)
     }
@@ -122,8 +122,26 @@ struct RootView: View {
 struct StatusView: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("duration") private var minutes = 60
+    @AppStorage("pomodoroMode") private var pomodoroMode = false
+    @AppStorage("breakMinutes") private var breakMinutes = 15
 
     private let presets = [15, 30, 60, 120, 240]
+    private let pomodoroPresets = [(25, 5), (45, 15), (50, 10)]
+
+    /// Wybór w menu „Czas”: "60" albo "p45/15".
+    private var choice: Binding<String> {
+        Binding(
+            get: { pomodoroMode ? "p\(minutes)/\(breakMinutes)" : "\(minutes)" },
+            set: { v in
+                if v.hasPrefix("p") {
+                    let parts = v.dropFirst().split(separator: "/").compactMap { Int($0) }
+                    minutes = parts[0]; breakMinutes = parts[1]; pomodoroMode = true
+                } else {
+                    minutes = Int(v) ?? 60; pomodoroMode = false
+                }
+            }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -133,30 +151,40 @@ struct StatusView: View {
                 GroupRow {
                     Text("Czas")
                     Spacer()
-                    Picker("", selection: $minutes) {
-                        ForEach(presets, id: \.self) { Text(durationLabel($0)).tag($0) }
-                        if !presets.contains(minutes) { Text(durationLabel(minutes)).tag(minutes) }
+                    Picker("", selection: choice) {
+                        ForEach(presets, id: \.self) { Text(durationLabel($0)).tag("\($0)") }
+                        if !pomodoroMode, !presets.contains(minutes) { Text(durationLabel(minutes)).tag("\(minutes)") }
+                        Divider()
+                        ForEach(pomodoroPresets, id: \.0) { w, b in Text("Pomodoro \(w)/\(b)").tag("p\(w)/\(b)") }
+                        if pomodoroMode, !pomodoroPresets.contains(where: { $0 == (minutes, breakMinutes) }) {
+                            Text("Pomodoro \(minutes)/\(breakMinutes)").tag("p\(minutes)/\(breakMinutes)")
+                        }
                     }
                     .labelsHidden()
                     .fixedSize()
                 }
                 Divider().padding(.leading, 10)
-                GroupRow {
-                    Text("Dokładnie")
-                    Spacer()
-                    Text(durationLabel(minutes)).monospacedDigit().foregroundStyle(.secondary)
-                    Stepper("", value: $minutes, in: 5...(24 * 60), step: 5).labelsHidden()
+                if pomodoroMode {
+                    GroupRow {
+                        Text("Praca")
+                        Text("\(minutes)").monospacedDigit().foregroundStyle(.secondary)
+                        Stepper("", value: $minutes, in: 5...240, step: 5).labelsHidden()
+                        Spacer()
+                        Text("Przerwa")
+                        Text("\(breakMinutes)").monospacedDigit().foregroundStyle(.secondary)
+                        Stepper("", value: $breakMinutes, in: 5...60, step: 5).labelsHidden()
+                    }
+                } else {
+                    GroupRow {
+                        Text("Dokładnie")
+                        Spacer()
+                        Text(durationLabel(minutes)).monospacedDigit().foregroundStyle(.secondary)
+                        Stepper("", value: $minutes, in: 5...(24 * 60), step: 5).labelsHidden()
+                    }
                 }
             }
 
-            Button { model.block(for: minutes) } label: {
-                Text(model.blocking ? "Przedłuż o \(durationLabel(minutes))" : "Zablokuj na \(durationLabel(minutes))")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(model.blocking ? .red : .accentColor)
-            .keyboardShortcut(.defaultAction)
+            mainButton
 
             let s = model.stats.summary(now: model.now)
             if s.allWeek > 0 {
@@ -176,8 +204,44 @@ struct StatusView: View {
                 }
             }
 
-            Text("Raz włączonej blokady nie da się przerwać.")
+            if let p = model.pomodoro {
+                HStack(spacing: 6) {
+                    Text("Pomodoro \(p.work)/\(p.rest) · sesja \(p.session)")
+                    Button("Zakończ cykl") { model.stopPomodoro() }
+                        .buttonStyle(.link)
+                }
                 .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Raz włączonej blokady nie da się przerwać.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder private var mainButton: some View {
+        if let p = model.pomodoro, p.phase == .rest {
+            Button { model.startPomodoro(work: p.work, rest: p.rest) } label: {
+                Text("Kolejna sesja \(p.work) min teraz").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.green)
+        } else if pomodoroMode && !model.blocking && model.pomodoro == nil {
+            Button { model.startPomodoro(work: minutes, rest: breakMinutes) } label: {
+                Text("Start pomodoro \(minutes)/\(breakMinutes)").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+        } else {
+            Button { model.block(for: minutes) } label: {
+                Text(model.blocking ? "Przedłuż o \(durationLabel(minutes))" : "Zablokuj na \(durationLabel(minutes))")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(model.blocking ? .red : .accentColor)
+            .keyboardShortcut(.defaultAction)
         }
     }
 }
@@ -199,8 +263,20 @@ struct Dial: View {
                         Text(countdown(now: now, until: until))
                             .font(.system(size: 30, weight: .light))
                             .monospacedDigit()
-                        Text("do \(until.formatted(date: .omitted, time: .shortened))")
+                        Text(sessionPrefix + "do \(until.formatted(date: .omitted, time: .shortened))")
                             .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else if let p = model.pomodoro, p.phase == .rest {
+                    Circle()
+                        .trim(from: 0, to: CGFloat(max(0.02, min(1, p.until.timeIntervalSince(now) / Double(p.rest * 60)))))
+                        .stroke(Color.green, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 2) {
+                        Text(countdown(now: now, until: p.until))
+                            .font(.system(size: 30, weight: .light))
+                            .monospacedDigit()
+                        Text("Przerwa · do \(p.until.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption).foregroundStyle(.green)
                     }
                 } else {
                     VStack(spacing: 4) {
@@ -214,6 +290,11 @@ struct Dial: View {
             }
             .frame(width: 140, height: 140)
         }
+    }
+
+    private var sessionPrefix: String {
+        guard let p = model.pomodoro, p.phase == .work else { return "" }
+        return "Sesja \(p.session) · "
     }
 
     private func progress(now: Date, until: Date) -> CGFloat {
@@ -446,3 +527,12 @@ struct TimeField: View {
 }
 
 func hm(_ m: Int) -> String { String(format: "%02d:%02d", m / 60, m % 60) }
+
+private func menuBarIcon(_ blocking: Bool) -> NSImage {
+    let name = blocking ? "hand.raised.fill" : "hand.raised"
+    let cfg = NSImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+    let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        .withSymbolConfiguration(cfg) ?? NSImage()
+    img.isTemplate = true
+    return img
+}
