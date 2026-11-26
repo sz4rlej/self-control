@@ -1,0 +1,20 @@
+#!/bin/zsh
+# Uruchamia demona, ufa certyfikatowi strony blokady i otwiera aplikację.
+LABEL=pl.softmasters.selfcontrold
+PLIST=/Library/LaunchDaemons/$LABEL.plist
+chown root:wheel $PLIST /usr/local/libexec/selfcontrold
+chmod 644 $PLIST; chmod 755 /usr/local/libexec/selfcontrold
+install -d -o root -g wheel "/Library/Application Support/SelfControl"
+launchctl bootstrap system $PLIST
+
+CA="/Library/Application Support/SelfControl/tls/ca.crt"
+for i in {1..40}; do [[ -f "$CA" ]] && break; sleep 0.5; done
+if [[ -f "$CA" ]] && ! security find-certificate -c "Self-Control Local CA" /Library/Keychains/System.keychain >/dev/null 2>&1; then
+  security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CA"
+fi
+
+USER_NAME=$(stat -f %Su /dev/console)
+if [[ -n "$USER_NAME" && "$USER_NAME" != root ]]; then
+  launchctl asuser "$(id -u "$USER_NAME")" sudo -u "$USER_NAME" open /Applications/Self-Control.app || true
+fi
+exit 0

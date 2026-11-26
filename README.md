@@ -14,6 +14,10 @@ Raz włączonej blokady nie da się obejść z poziomu aplikacji: można ją tyl
 
 ## Instalacja
 
+Najprościej: otwórz `Self-Control-<wersja>.dmg` i uruchom `Zainstaluj Self-Control.pkg` (przy pierwszym otwarciu: Ustawienia systemowe → Prywatność i ochrona → „Otwórz mimo to”). Obraz buduje `scripts/build-dmg.sh` do katalogu `build/`.
+
+Ze źródeł:
+
 ```sh
 git clone https://github.com/sz4rlej/self-control.git
 cd self-control

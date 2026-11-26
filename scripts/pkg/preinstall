@@ -1,0 +1,7 @@
+#!/bin/zsh
+# Zatrzymuje starą wersję przed podmianą plików.
+LABEL=pl.softmasters.selfcontrold
+pkill -x SelfControlApp 2>/dev/null || true
+launchctl bootout system/$LABEL 2>/dev/null || true
+for i in {1..20}; do launchctl print system/$LABEL >/dev/null 2>&1 || break; sleep 0.5; done
+exit 0
